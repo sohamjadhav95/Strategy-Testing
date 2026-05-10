@@ -318,12 +318,6 @@ class DualSpeedBracketScalper:
         if abs(existing_price - target_price) < self.recenter_threshold:
             return False
 
-        if order_type == mt5.ORDER_TYPE_BUY_STOP and target_price <= existing_price:
-            return False
-
-        if order_type == mt5.ORDER_TYPE_SELL_STOP and target_price >= existing_price:
-            return False
-
         return modify_order(existing_order.ticket, target_price)
 
     def update_bracket(self) -> None:
@@ -403,7 +397,7 @@ class DualSpeedBracketScalper:
         return self._start_trade_from_cached_position()
 
     def trail_stop_loss(self) -> None:
-        pos = self.cached_position
+        pos = self.refresh_position_cache()
         if pos is None:
             self._on_position_closed()
             return
@@ -475,6 +469,7 @@ class DualSpeedBracketScalper:
         self.entry_time_ms = None
         self.best_price = None
         self.last_bracket_mid = None
+        self.last_bracket_update_ts = 0.0
         self.cached_position = None
         self.last_bid = None
         self.last_ask = None
@@ -538,9 +533,11 @@ class DualSpeedBracketScalper:
                 self.handle_fast_tick()
 
                 if self.in_trade:
+                    self.refresh_position_cache()
                     if self.cached_position is None:
-                        self.refresh_position_cache()
-                    cancel_all_our_orders()
+                        self._on_position_closed()
+                    else:
+                        cancel_all_our_orders()
                 else:
                     self.refresh_position_cache()
                     self.check_for_fill()
